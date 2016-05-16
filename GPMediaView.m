@@ -24,11 +24,14 @@
     NSString *audioURL;*/
     NSString* mediaURL;
     NSMutableData* mediaData;
+    int mediaType;
+    int status;
     
 }
 @synthesize isCacheImage, showActivityIndicator;
 
 @synthesize defaultImage, videoPlayer;
+
 
 + (NSString*)getUniquePath:(NSString*)  urlStr
 {
@@ -101,49 +104,70 @@
         }
         
         /* --- Switch to main thread If not in main thread URLConnection wont work --- */
-        [self downloadMediaWithUrl:mediaURL];
+        [self downloadMediaWithUrl:url andMediaType:IMAGE];
     }
     
 }
 #pragma mark VIDEO
 -(void)playVideo:(NSString*)url{
-    if(videoPlayer==nil)
-    {
-        videoPlayer=[[AVPlayer alloc]init];
-    }
-    else
+    if(videoPlayer!=nil)
     {
         [videoPlayer pause];
     }
-    
-    mediaURL = [GPMediaView getUniquePath:url];
+    if(url!=nil)
+    {
+        mediaURL = [GPMediaView getUniquePath:url];
+    }
     
     if ([[NSFileManager defaultManager] fileExistsAtPath:mediaURL])
     {
         /* --- Set Cached Video --- */
         NSURL* tmpUrl = [NSURL fileURLWithPath:mediaURL];
-        videoPlayer = [videoPlayer initWithURL:tmpUrl];
-        _videoLayer = [AVPlayerLayer playerLayerWithPlayer:videoPlayer];
-        videoPlayer.actionAtItemEnd = AVPlayerActionAtItemEndNone;
-        _videoLayer.frame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
-        [self.layer addSublayer: _videoLayer];
+        if(videoPlayer==nil)
+        {
+            videoPlayer = [[AVPlayer alloc] initWithURL:tmpUrl];
+            _videoLayer = [AVPlayerLayer playerLayerWithPlayer:videoPlayer];
+            videoPlayer.actionAtItemEnd = AVPlayerActionAtItemEndNone;
+            _videoLayer.frame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
+            
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
+        }
+        else
+        {
+            [videoPlayer cancelPendingPrerolls];
+            AVPlayerItem* itemTmp = [[AVPlayerItem alloc] initWithURL:tmpUrl];
+            [videoPlayer replaceCurrentItemWithPlayerItem:itemTmp];
+        }
         
+        if(![self.layer.sublayers containsObject:_videoLayer])
+        {
+            [self.layer addSublayer: _videoLayer];
+        }
         [videoPlayer play];
     }
     /* --- Download Image from URL --- */
     else
     {
         /* --- Switch to main thread If not in main thread URLConnection wont work --- */
-        [self downloadMediaWithUrl:mediaURL];
+        [self downloadMediaWithUrl:url andMediaType:VIDEO];
     }
+}
+-(void)itemDidFinishPlaying:(NSNotification*)notification{
+   
 }
 #pragma mark AUDIO
 -(void)playAudio:(NSString*)url{
     
 }
 #pragma mark GENERAL
--(void)downloadMediaWithUrl:(NSString*)url
+-(void)downloadMediaWithUrl:(NSString*)url andMediaType:(int)type
 {
+    if(status==DOWNLOADING)
+    {
+        return;
+    }
+    mediaType = type;
+    
     dispatch_async(dispatch_get_main_queue(), ^{
         
         mediaURL = url;
@@ -158,7 +182,7 @@
                        forMode:NSRunLoopCommonModes];
         
         [con start];
-        
+        status = DOWNLOADING;
         if (con) {
             mediaData = [NSMutableData new];
         }
@@ -184,6 +208,7 @@
     NSLog(@"Error downloading");
     
     mediaData = nil;
+    status = IDLE;
 }
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection
@@ -197,16 +222,32 @@
         
         [activityIndicator removeFromSuperview];
     }
-    
-    /* --- set Image Data --- */
-    [self setImage:[UIImage imageWithData:mediaData]];
-    
-    /* --- Get Cache Image --- */
-    if (isCacheImage) {
-        [mediaData writeToFile:[GPMediaView getUniquePath:mediaURL]
-                    atomically:YES];
+    switch (mediaType) {
+        case IMAGE:
+            /* --- set Image Data --- */
+            [self setImage:[UIImage imageWithData:mediaData]];
+            
+            /* --- Get Cache Image --- */
+            if (isCacheImage) {
+                [mediaData writeToFile:[GPMediaView getUniquePath:mediaURL]
+                            atomically:YES];
+            }
+
+            break;
+        case VIDEO:
+            [mediaData writeToFile:[GPMediaView getUniquePath:mediaURL]
+                        atomically:YES];
+            [self playVideo:nil];
+            break;
+        case AUDIO:
+            [mediaData writeToFile:[GPMediaView getUniquePath:mediaURL]
+                        atomically:YES];
+            
+            break;
+        default:
+            break;
     }
-    
+    status = IDLE;
     mediaData = nil;
     
 }
