@@ -13,15 +13,6 @@
 
 @implementation GPMediaView
 {
-    //NSMutableData *mediaData;
-    
-    //NSMutableData *videoData;
-    //NSMutableData *audioData;
-    
-   /* NSString *mediaURL;
-    
-    NSString *videoURL;
-    NSString *audioURL;*/
     NSString* mediaURL;
     NSMutableData* mediaData;
     int mediaType;
@@ -118,6 +109,10 @@
     {
         mediaURL = [GPMediaView getUniquePath:url];
     }
+    else
+    {
+        mediaURL = [GPMediaView getUniquePath:mediaURL];
+    }
     
     if ([[NSFileManager defaultManager] fileExistsAtPath:mediaURL])
     {
@@ -130,7 +125,7 @@
             videoPlayer.actionAtItemEnd = AVPlayerActionAtItemEndNone;
             _videoLayer.frame = CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
             
-            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
+            //[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
         }
         else
         {
@@ -152,13 +147,44 @@
         [self downloadMediaWithUrl:url andMediaType:VIDEO];
     }
 }
--(void)itemDidFinishPlaying:(NSNotification*)notification{
-   
-}
+
 #pragma mark AUDIO
--(void)playAudio:(NSString*)url{
+-(void)playAudio:(NSString*)url andNumLoops:(int)num{
+    if(_audioPlayer!=nil)
+    {
+        [_audioPlayer stop];
+    }
+    if(url!=nil)
+    {
+        mediaURL = [GPMediaView getUniquePath:url];
+    }
+    else
+    {
+        mediaURL = [GPMediaView getUniquePath:mediaURL];
+    }
     
-}
+    if ([[NSFileManager defaultManager] fileExistsAtPath:mediaURL])
+    {
+        /* --- Set Cached Video --- */
+        NSURL* tmpUrl = [NSURL fileURLWithPath:mediaURL];
+        
+            _audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:tmpUrl
+                                                                           error:nil];
+            _audioPlayer.numberOfLoops = num; //-1 Infinite
+            
+            [_audioPlayer play];
+
+        
+        
+    }
+    /* --- Download Image from URL --- */
+    else
+    {
+        /* --- Switch to main thread If not in main thread URLConnection wont work --- */
+        [self downloadMediaWithUrl:url andMediaType:AUDIO];
+    }
+    
+        }
 #pragma mark GENERAL
 -(void)downloadMediaWithUrl:(NSString*)url andMediaType:(int)type
 {

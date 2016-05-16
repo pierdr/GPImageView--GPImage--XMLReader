@@ -8,6 +8,7 @@
 
 #import <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
+#import <AudioToolbox/AudioToolbox.h>
 
 #define AUDIO       1
 #define VIDEO       2
@@ -38,7 +39,8 @@
 
 
 /* --- Audio from URL --- */
--(void)playAudio:(NSString*)url;
+-(void)playAudio:(NSString*)url andNumLoops:(int)num;
+@property (nonatomic,strong) AVAudioPlayer*     audioPlayer;
 
 /* --- Reset --- */
 -(void)resetView;
